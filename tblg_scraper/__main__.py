@@ -6,6 +6,8 @@ from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 import pandas as pd
 
+from .logger import logger
+
 
 def driver_factory():
     options = webdriver.ChromeOptions()
@@ -15,7 +17,7 @@ def driver_factory():
 
 
 URL_FORMAT_FOR_LIST = 'https://tabelog.com/atw/rvw/COND-0-2-1-0/D-edited_at/{0}/?LstRange=&rvw_part=all&sw='
-FILE_NAME = 'result_20190622.csv'
+FILE_NAME = 'result_20190623.csv'
 
 
 def count_reviews() -> int:
@@ -44,30 +46,35 @@ def get_review_comment(page_url: str) -> str:
 
 driver = driver_factory()
 n_reviews = count_reviews()
-print('total pages: {0}'.format(n_reviews))
+logger.info('total pages: {0}'.format(n_reviews))
 n_pages = n_reviews // 100 + 1
 url_set = set()
 is_first_row = True
 
 for i_page in range(n_pages):
 
-    print('page-{0}'.format(i_page + 1))
+    logger.info('page-{0}'.format(i_page + 1))
     url = URL_FORMAT_FOR_LIST.format(i_page + 1)
     driver.get(url)
     data = []
 
-    for i_review, review_item in enumerate(driver.find_elements_by_class_name('rvw-item')):
+    review_items = driver.find_elements_by_class_name('rvw-item')
+    if len(review_items) == 0:
+        logger.debug('no review item in this page.')
 
-        print('scraping {0}th review'.format(i_page * 100 + i_review))
+    for review_item in review_items:
+
+        logger.info('scraping {0}th review'.format(len(url_set)))
 
         # review content
         try:
             clickable_element = review_item.find_element_by_css_selector('div.rvw-item__frame.js-rvw-clickable-area')
         except NoSuchElementException:
-            print('no clickable element')
+            logger.debug('no clickable element')
             continue
         review_url = clickable_element.get_attribute('data-detail-url')
         if review_url in url_set:
+            logger.debug('{0} is already fetched.'.format(review_url))
             continue
         else:
             url_set.add(review_url)
@@ -103,8 +110,6 @@ for i_page in range(n_pages):
         except Exception as e:
             print(e)
             print(review_url)
-
-        break
 
     df = pd.DataFrame(data, columns=[
         'restaurant_name',
